@@ -16,6 +16,9 @@ module.exports = {
         use: [
           {
             loader: path.resolve('./src/loader1.js')
+          },
+          {
+            loader: path.resolve('./src/async-loader.js')
           }
         ]
       }
