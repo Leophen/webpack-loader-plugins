@@ -1,4 +1,6 @@
 const path = require('path')
+const Plugin1 = require('./src/plugin1')
+const Plugin2 = require('./src/plugin2')
 
 module.exports = {
   mode: 'development',
@@ -23,5 +25,9 @@ module.exports = {
         ]
       }
     ]
-  }
+  },
+  plugins: [
+    // new Plugin1(), // webpack 5 之前可用
+    new Plugin2() // webpack 5 之后 compiler.hooks 的写法
+  ]
 }
