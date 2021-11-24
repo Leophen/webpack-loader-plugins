@@ -8,7 +8,36 @@ Handwritten implementation of loader &amp; plugins
 
 ### 1、简单 loader 的实现
 
-loader 其实是一个函数，它的参数是匹配文件的源码，返回结果是处理后的源码。下面是一个最简单的 loader，它什么都没做：
+loader 其实是一个函数，它的参数是 webpack 传递给 loader 的文件源码，返回结果是处理后的源码。
+
+**注意：**loader 中的 `this` 是由 webpack 提供的对象，能够获取当前 loader 所需要的各种信息，`this` 作为上下文会被 webpack 填充，因此不能将 loader 设为一个箭头函数。
+
+一个基本的 loader 如下：
+
+```js
+// 导出一个函数，source 为 webpack 传递给 loader 的文件源内容
+module.exports = function (source) {
+  const content = doSomeThing2JsString(source)
+
+  // 如果 loader 配置了 options 对象，那么 this.query 将指向 options
+  const options = this.query
+
+  // 可以用作解析其他模块路径的上下文
+  console.log('this.context')
+
+  /*
+   * this.callback 参数：
+   * error：Error | null，当 loader 出错时向外抛出一个 error
+   * content：String | Buffer，经过 loader 编译后需要导出的内容
+   * sourceMap：为方便调试生成的编译后内容的 source map
+   * ast：本次编译生成的 AST 静态语法树，之后执行的 loader 可以直接使用这个 AST，进而省去重复生成 AST 的过程
+   */
+  this.callback(null, content) // 异步
+  return content // 同步
+}
+```
+
+下面是一个最简单的 loader，它什么都没做：
 
 ```js
 module.exports = function (source) {
@@ -142,6 +171,8 @@ module.exports = function (source) {
 
 ## 二、插件的实现
 
+由于 webpack 基于发布订阅模式，在运行的生命周期中会广播出许多事件，插件通过监听这些事件，就可以在特定的阶段执行自己的插件任务。
+
 ### 1、插件的组成
 
 webpack 插件由以下组成：
@@ -167,10 +198,10 @@ HelloWorldPlugin.prototype.apply = function (compiler) {
   // 指定一个挂载到 webpack 自身的事件钩子
   compiler.plugin(
     'done',
-    function (compilation /* 处理 webpack 内部实例的特定数据 */, callback) {
+    function (compilation /* 当前打包构建流程的上下文 */, callback) {
       console.log('Hello World!')
 
-      // 功能完成后调用 webpack 提供的回调
+      // 功能完成后可以调用 webpack 提供的回调
       callback()
     }
   )
@@ -181,9 +212,9 @@ module.exports = HelloWorldPlugin
 
 上面代码中，
 
-- [compiler](https://www.webpackjs.com/api/compiler-hooks/) 模块扩展自 *Tapable* 类，*compiler* 对象包含了 webpack 环境所有的配置信息，在启动 webpack 时被实例化，可理解为 webpack 实例，用来注册和调用插件。
+- [compiler](https://www.webpackjs.com/api/compiler-hooks/) 扩展自 *Tapable* 类，包含了 webpack 环境所有的配置信息，在启动 webpack 时被实例化，可理解为 webpack 实例，用来注册和调用插件。
 
-- [compilation](https://www.webpackjs.com/api/compilation-hooks/) 模块也扩展自 *Tapable* 类，*Compilation* 对象包含了当前的模块资源、编译生成资源、变化的文件等，当 webpack 以开发模式运行时，每检测到一个文件变化，一次新的 *Compilation* 将被创建。*Compilation* 对象也提供了很多事件回调供插件做扩展。通过 *Compilation* 也能读取到 *Compiler* 对象。
+- [compilation](https://www.webpackjs.com/api/compilation-hooks/) 也扩展自 *Tapable* 类，作为 *plugin* 内置事件回调函数的参数，包含了当前的模块资源、编译生成资源、变化的文件等，当 webpack 以开发模式运行时，每检测到一个文件变化，一次新的 *Compilation* 将被创建。*Compilation* 对象也提供了很多事件回调供插件做扩展。通过 *Compilation* 也能读取到 *Compiler* 对象。
 
 **Compiler 和 Compilation 的区别：**
 
@@ -193,12 +224,13 @@ module.exports = HelloWorldPlugin
 
 ```js
 class HelloWorldPlugin {
+  // webpack 会调用 HelloWorldPlugin 实例的 apply 方法给插件实例传入 compiler 对象
   apply(compiler) {
-    // 指定一个挂载到 webpack 自身的事件钩子
+    // 指定一个挂载到 webpack 自身的事件钩子，实现插件功能
     compiler.hooks.done.tap('HelloWorldPlugin', (compilation, callback) => {
+      // compilation 为当前打包构建流程的上下文
       console.log('Hello World!')
-
-      // 功能完成后调用 webpack 提供的回调
+      // 功能完成后可以调用 webpack 提供的回调
       callback()
     })
   }
